@@ -1,0 +1,13 @@
+{
+  "name": "Googlr",
+  "short_name": "Googlr",
+  "description": "Reverse image search — find where any image comes from",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f0ebe0",
+  "theme_color": "#c4a265",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

@@ -1,0 +1,215 @@
+/* ============================================================
+   GOOGLR — corkboard, note cards, thumbtacks
+   ============================================================ */
+
+/* ---- The corkboard itself ---- */
+.corkboard {
+  position: relative;
+  border-radius: 16px;
+  padding: 28px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  background:
+    radial-gradient(ellipse at 20% 30%, rgba(210, 170, 100, 0.6) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(180, 140, 70, 0.5) 0%, transparent 50%),
+    linear-gradient(135deg, #c4a265 0%, #b8955a 30%, #c8a870 60%, #b09050 100%);
+  box-shadow:
+    inset 0 2px 8px rgba(0, 0, 0, 0.25),
+    0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* Cork grain — tiny dark amber specks, tiled */
+.corkboard::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background-image:
+    radial-gradient(ellipse 2.4px 1.4px at 12% 18%, rgba(94, 62, 18, 0.38) 35%, transparent 100%),
+    radial-gradient(ellipse 1.4px 1px at 34% 62%, rgba(120, 84, 30, 0.34) 35%, transparent 100%),
+    radial-gradient(ellipse 2.8px 1.6px at 58% 30%, rgba(80, 52, 14, 0.36) 35%, transparent 100%),
+    radial-gradient(ellipse 1.2px 2.2px at 74% 78%, rgba(110, 76, 26, 0.35) 35%, transparent 100%),
+    radial-gradient(ellipse 2px 1.2px at 88% 14%, rgba(94, 62, 18, 0.32) 35%, transparent 100%),
+    radial-gradient(ellipse 1.6px 2.6px at 22% 88%, rgba(84, 56, 20, 0.37) 35%, transparent 100%),
+    radial-gradient(ellipse 1.2px 1.2px at 66% 58%, rgba(130, 92, 34, 0.3) 35%, transparent 100%),
+    radial-gradient(ellipse 2.2px 1.5px at 45% 8%, rgba(100, 66, 22, 0.33) 35%, transparent 100%);
+  background-size: 96px 96px;
+  background-repeat: repeat;
+}
+
+/* ---- Paper note cards ---- */
+.note-card {
+  position: relative;
+  z-index: 1;
+  padding: 20px 16px 16px;
+  border-radius: 3px;
+  background: linear-gradient(160deg, #fdfaf2 0%, #f8f3e6 60%, #f2ead8 100%);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transform: rotate(var(--tilt, -1.5deg));
+  animation: cardDrop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.corkboard > .note-card:nth-child(odd) { --tilt: -1.5deg; }
+.corkboard > .note-card:nth-child(even) { --tilt: 1deg; }
+
+@keyframes cardDrop {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95) rotate(var(--tilt, -1.5deg));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) rotate(var(--tilt, -1.5deg));
+  }
+}
+
+.note-title {
+  font-family: var(--font-ui);
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  color: var(--ink-soft);
+  margin-bottom: 12px;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+/* ---- Thumbtacks ---- */
+.tack {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  box-shadow: 0 3px 4px rgba(0, 0, 0, 0.35), 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+.tack::after {
+  /* specular highlight */
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.2) 65%, transparent 100%);
+}
+.tack-red {
+  background: radial-gradient(circle at 32% 30%, #f2867c 0%, #e74c3c 45%, #922b21 100%);
+}
+.tack-teal {
+  background: radial-gradient(circle at 32% 30%, #9adcdc 0%, #5dbbbb 45%, #2e7070 100%);
+}
+.tack-gold {
+  background: radial-gradient(circle at 32% 30%, #f7e28a 0%, #f1c40f 45%, #9a7d0a 100%);
+}
+
+/* ---- Source URL list (card 1) ---- */
+.sources-list {
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.source-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 2px;
+  border-bottom: 1px dashed rgba(122, 110, 94, 0.28);
+  text-decoration: none;
+}
+.source-link:last-child { border-bottom: none; }
+.globe-fav {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--teal-dark);
+  background: radial-gradient(circle at 35% 30%, #ffffff 0%, var(--paper-shadow) 100%);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.12);
+}
+.source-url {
+  font-family: var(--font-body);
+  font-size: 15.5px;
+  color: var(--teal-dark);
+  text-decoration: underline;
+  text-underline-offset: 2.5px;
+  text-decoration-color: rgba(53, 112, 112, 0.5);
+  word-break: break-all;
+}
+.source-link:hover .source-url { color: var(--teal); }
+.sources-empty {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 14.5px;
+  color: var(--ink-muted);
+}
+
+.partial-title {
+  font-family: var(--font-ui);
+  font-size: 10.5px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  margin: 14px 0 2px;
+}
+
+/* ---- Entity tag cloud (card 2) ---- */
+.entity-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.entity-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-family: var(--font-ui);
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  background: linear-gradient(to bottom, #fdfaf2 0%, #efe7d4 100%);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.14),
+    0 1px 0 rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(200, 191, 175, 0.5);
+}
+.entity-chip:nth-child(3n) { transform: rotate(0.8deg); }
+.entity-chip:nth-child(3n + 1) { transform: rotate(-0.8deg); }
+.entity-score {
+  font-size: 10px;
+  color: var(--teal-dark);
+  letter-spacing: 0.3px;
+}
+
+/* ---- Similar images strip (card 3) ---- */
+.similar-strip {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 2px 10px;
+  overscroll-behavior-x: contain;
+}
+.similar-thumb {
+  flex: none;
+  height: 78px;
+  width: auto;
+  border-radius: 6px;
+  border: 3px solid var(--paper);
+  background: var(--paper-shadow);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.similar-empty {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 14.5px;
+  color: var(--ink-muted);
+}
