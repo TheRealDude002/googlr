@@ -329,7 +329,6 @@ main.app-main { flex: 1 0 auto; }
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 40px;
   background:
     radial-gradient(ellipse at 25% 20%, rgba(255, 235, 190, 0.5) 0%, transparent 55%),
     linear-gradient(135deg, var(--cork-light) 0%, var(--cork) 50%, var(--cork-dark) 100%);
@@ -338,6 +337,11 @@ main.app-main { flex: 1 0 auto; }
     inset 0 -3px 6px rgba(0, 0, 0, 0.25),
     0 8px 20px rgba(0, 0, 0, 0.25);
   animation: pinPulse 1.4s ease-in-out infinite;
+}
+.loading-pin .icon {
+  width: 46px;
+  height: 46px;
+  filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.35));
 }
 @keyframes pinPulse {
   0%, 100% { transform: scale(1); }
