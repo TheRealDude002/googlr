@@ -1,7 +1,6 @@
 'use client';
 
 import SkeuButton from '../SkeuButton';
-import { MagnifierIcon } from '../Icons';
 
 interface PreviewProps {
   previewUrl: string;
@@ -32,7 +31,7 @@ export default function Preview({ previewUrl, error, onBack, onSearch, onChooseD
       ) : null}
 
       <SkeuButton variant="cta" block onClick={onSearch}>
-        <MagnifierIcon /> Search This Image
+        <span className="emoji" aria-hidden="true">🔍</span> Search This Image
       </SkeuButton>
 
       <button type="button" className="text-link" onClick={onChooseDifferent}>
