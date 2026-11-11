@@ -1,16 +1,4 @@
-// ============================================================
-// Googlr — Cloudflare Worker
-// Server-side proxy for the Google Cloud Vision API.
-// Receives { image: "<base64>", mimeType: "image/jpeg" },
-// calls Vision WEB_DETECTION + SAFE_SEARCH_DETECTION,
-// returns structured JSON. Never writes to disk, never leaks the key.
-//
-// Deploy:
-//   wrangler secret put GOOGLE_VISION_API_KEY
-//   wrangler deploy
-// ============================================================
-
-const worker = {
+export default {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, {
@@ -22,52 +10,114 @@ const worker = {
       });
     }
 
-    if (request.method !== 'POST') return new Response('Method not allowed', { status: 405 });
+    if (request.method !== 'POST') {
+      return new Response('Method not allowed', { status: 405 });
+    }
 
-    const { image, mimeType } = await request.json();
+    try {
+      const { image } = await request.json();
 
-    const visionRes = await fetch(
-      `https://vision.googleapis.com/v1/images:annotate?key=${env.GOOGLE_VISION_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          requests: [{
-            image: { content: image },
-            features: [
-              { type: 'WEB_DETECTION', maxResults: 20 },
-              { type: 'SAFE_SEARCH_DETECTION' }
-            ]
-          }]
-        })
+      // Strip base64 prefix if present
+      const base64 = image.includes(',') ? image.split(',')[1] : image;
+
+      // Step 1: Upload to ImgBB
+      const imgbbForm = new URLSearchParams();
+      imgbbForm.append('image', base64);
+      imgbbForm.append('expiration', '300');
+
+      const imgbbRes = await fetch(
+        `https://api.imgbb.com/1/upload?key=${env.IMGBB_API_KEY}`,
+        { method: 'POST', body: imgbbForm }
+      );
+
+      if (!imgbbRes.ok) {
+        throw new Error(`ImgBB upload failed: ${imgbbRes.status}`);
       }
-    );
 
-    const data = await visionRes.json();
-    const annotation = data.responses[0];
-    const web = annotation.webDetection || {};
-    const safe = annotation.safeSearchAnnotation || {};
+      const imgbbData = await imgbbRes.json();
+      const imageUrl = imgbbData.data.url;
 
-    const isFlagged = ['LIKELY', 'VERY_LIKELY'].includes(safe.adult) ||
-                      ['LIKELY', 'VERY_LIKELY'].includes(safe.violence);
+      // Step 2: Send to Scrapingdog Google Lens
+      const params = new URLSearchParams({
+        api_key: env.SCRAPINGDOG_API_KEY,
+        url: imageUrl,
+        visual_matches: 'true',
+        country: 'us',
+      });
 
-    return new Response(JSON.stringify({
-      bestGuess: web.bestGuessLabels?.[0]?.label || 'Unknown',
-      safeSearch: isFlagged ? 'flagged' : 'safe',
-      sources: (web.fullMatchingImages || []).slice(0, 5).map(i => ({ url: i.url })),
-      partialMatches: (web.partialMatchingImages || []).slice(0, 3).map(i => ({ url: i.url })),
-      similarImages: (web.visuallySimilarImages || []).slice(0, 10).map(i => ({ url: i.url })),
-      entities: (web.webEntities || []).slice(0, 8).map(e => ({
-        name: e.description,
-        score: e.score
-      }))
-    }), {
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+      const dogRes = await fetch(
+        `https://api.scrapingdog.com/google_lens?${params.toString()}`
+      );
+
+      if (!dogRes.ok) {
+        throw new Error(`Scrapingdog failed: ${dogRes.status}`);
       }
-    });
+
+      const dogData = await dogRes.json();
+
+      // Step 3: Shape response to match what the frontend expects
+      const organic = dogData.organic_results || [];
+      const visual = dogData.visual_matches || [];
+      const kg = dogData.knowledge_graph || {};
+
+      // Best guess: knowledge graph title → first organic title → first visual title → fallback
+      const bestGuess =
+        kg.title ||
+        organic[0]?.title ||
+        visual[0]?.title ||
+        'No match found';
+
+      // Sources: organic results (pages where image appears)
+      const sources = organic.slice(0, 5).map(r => ({
+        url: r.link,
+        label: r.source || new URL(r.link).hostname,
+      }));
+
+      // Similar images: visual matches thumbnail strip
+      const similarImages = visual.slice(0, 10).map(v => ({
+        url: v.thumbnail,
+        sourceUrl: v.link,
+        title: v.title,
+      }));
+
+      // Entities: deduplicated titles from organic + visual as tag cloud
+      const seen = new Set();
+      const entities = [...organic, ...visual]
+        .map(r => r.title)
+        .filter(t => t && !seen.has(t) && seen.add(t))
+        .slice(0, 8)
+        .map(name => ({ name, score: null }));
+
+      return new Response(JSON.stringify({
+        bestGuess,
+        safeSearch: 'safe',      // Scrapingdog doesn't flag; default safe
+        sources,
+        partialMatches: [],
+        similarImages,
+        entities,
+      }), {
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        }
+      });
+
+    } catch (err) {
+      return new Response(JSON.stringify({
+        error: err.message,
+        bestGuess: 'Search failed',
+        safeSearch: 'safe',
+        sources: [],
+        partialMatches: [],
+        similarImages: [],
+        entities: [],
+      }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        }
+      });
+    }
   }
 };
-
-export default worker;
