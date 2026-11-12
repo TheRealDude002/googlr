@@ -8,4 +8,4 @@ LENS_WORKER_URL = "http://localhost:8788"
 
 # Production — points at deployed lens-worker
 [env.production.vars]
-LENS_WORKER_URL = "https://googlr-lens-worker.<your-subdomain>.workers.dev"
+LENS_WORKER_URL = "https://googlr-lens-worker-production.ojezlekan1234.workers.dev"
