@@ -132,8 +132,8 @@ npx wrangler secret delete SCRAPINGDOG_API_KEY   # if present
 Then:
 
 1. **Push this repo to GitHub.**
-2. **Connect the repo to Cloudflare Pages** — build command `npm run build`, output dir per Next.js (`.next` via `@cloudflare/next-on-pages`).
-3. **Set environment variables in Pages settings** — either `IMGBB_API_KEY` + `LENS_WORKER_URL` (route runs on the Pages Functions runtime) **or** `NEXT_PUBLIC_WORKER_URL` pointing at your deployed proxy-worker.
+2. **Connect the repo to Cloudflare Pages** — build command `npx @cloudflare/next-on-pages@1`, output directory `.vercel/output/static`.
+3. **Set environment variables in Pages settings (before the first build)** — either `NEXT_PUBLIC_WORKER_URL` pointing at your deployed proxy-worker (recommended), or `IMGBB_API_KEY` + `LENS_WORKER_URL` so `/api/search` runs the pipeline on the Pages Functions runtime. `NEXT_PUBLIC_*` vars are inlined at build time, so set them before deploying.
 4. **Push** — Cloudflare Pages auto-deploys. Add the app to your home screen to install the PWA.
 
 Secrets are set per worker with `wrangler secret put` (never committed — the `.dev.vars` files are gitignored).
