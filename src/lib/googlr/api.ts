@@ -13,7 +13,7 @@ export interface SearchOutcome {
  * 2. POST base64 to the search endpoint:
  *    - same-origin Next.js API route (/api/search) by default, or
  *    - a Cloudflare Worker when NEXT_PUBLIC_WORKER_URL is set at build time.
- * The Vision API key never touches the frontend.
+ * The ImgBB and Scrapingdog API keys live server-side only — the browser never sees them.
  */
 export async function searchImage(file: File): Promise<SearchOutcome> {
   const imageDataUrl = await compressImage(file, 1024 * 1024);

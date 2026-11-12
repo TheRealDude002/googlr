@@ -82,7 +82,7 @@ export default function Results({ result, onBack, onSearchAgain, onToast }: Resu
           {flagged ? '⚠ flagged' : '✓ safe'} · safe search
         </span>
         {result.demo ? (
-          <p className="demo-note">demo mode — add GOOGLE_VISION_API_KEY for live results</p>
+          <p className="demo-note">demo mode — add IMGBB_API_KEY + SCRAPINGDOG_API_KEY for live results</p>
         ) : null}
       </header>
 
@@ -119,7 +119,9 @@ export default function Results({ result, onBack, onSearchAgain, onToast }: Resu
                 {result.entities.map((entity, i) => (
                   <span key={i} className="entity-chip">
                     {entity.name}
-                    <span className="entity-score">{Math.round(entity.score * 100)}%</span>
+                    {typeof entity.score === 'number' ? (
+                      <span className="entity-score">{Math.round(entity.score * 100)}%</span>
+                    ) : null}
                   </span>
                 ))}
               </div>

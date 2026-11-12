@@ -9,7 +9,7 @@
 > | Next.js API route (default) | `src/app/api/search/route.ts` | Running the app as-is (`bun run dev` / Node host) |
 > | Cloudflare Worker | `worker/index.js` | Static deployment on Cloudflare Pages |
 >
-> The frontend calls `NEXT_PUBLIC_WORKER_URL` if set at build time, otherwise it POSTs to the same-origin `/api/search`. The Vision API key is **never** in frontend code in either setup.
+> The frontend calls `NEXT_PUBLIC_WORKER_URL` if set at build time, otherwise it POSTs to the same-origin `/api/search`. The ImgBB and Scrapingdog keys are **never** in frontend code in either setup.
 
 ---
 
@@ -24,7 +24,9 @@
 
 ## Tech stack
 
-Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · Google Cloud Vision API (**Web Detection**: `bestGuessLabels`, `fullMatchingImages`, `partialMatchingImages`, `visuallySimilarImages`, `webEntities`, `safeSearchAnnotation`)
+Next.js 16 (App Router) · TypeScript · Tailwind CSS 4 · **ImgBB** (free image hosting, no card — auto-deletes uploads after 5 min) + **Scrapingdog Google Lens API** (reverse image search, no card — 1,000 free credits, 5 per search)
+
+Search pipeline: image (base64, ≤ 1 MB) → ImgBB upload → public URL → Scrapingdog Lens → shaped JSON (`bestGuess`, `sources`, `partialMatches`, `similarImages`, `entities`, `safeSearch`).
 
 Typography: Playfair Display (display) · Crimson Text (body) · Special Elite (UI chrome). The logo is an inline SVG — grey embossed Playfair letterforms, no image file.
 
@@ -41,19 +43,20 @@ bun run lint
 Copy `.env.example` → `.env`:
 
 ```bash
-GOOGLE_VISION_API_KEY=your_vision_api_key_here   # server-side only
+IMGBB_API_KEY=your_imgbb_api_key_here             # server-side only — free at api.imgbb.com
+SCRAPINGDOG_API_KEY=your_scrapingdog_api_key_here # server-side only — free at scrapingdog.com
 # NEXT_PUBLIC_WORKER_URL=https://googlr-worker.<your-subdomain>.workers.dev  # optional: use Cloudflare Worker instead of /api/search
 ```
 
-**Demo mode:** if `GOOGLE_VISION_API_KEY` is unset, `/api/search` returns clearly-flagged demo results (a "demo mode" note appears on the results screen) so the full UI flow is testable without a key.
+**Demo mode:** if either key is unset, `/api/search` returns clearly-flagged demo results (a "demo mode" note appears on the results screen) so the full UI flow is testable without keys.
 
 ## Deployment (Cloudflare Pages + Worker)
 
-1. **Create the Vision key** — in the Google Cloud console, enable the **Cloud Vision API** and create an API key, restricted to the Vision API only.
-2. **Deploy the Worker** — `wrangler secret put GOOGLE_VISION_API_KEY`, then `wrangler deploy` (config in `wrangler.toml`). This worker receives `{ image, mimeType }`, calls Vision, returns structured JSON, and never writes to disk.
+1. **Create the two keys** — sign up at **imgbb.com** and grab the API key from api.imgbb.com, then sign up at **scrapingdog.com** and grab the key from the dashboard. No credit card needed for either.
+2. **Deploy the Worker** — `wrangler secret put IMGBB_API_KEY`, `wrangler secret put SCRAPINGDOG_API_KEY`, then `wrangler deploy` (config in `wrangler.toml`). This worker receives `{ image, mimeType }`, uploads to ImgBB, queries Scrapingdog Google Lens, returns structured JSON, and never writes to disk.
 3. **Push this repo to GitHub.**
 4. **Connect the repo to Cloudflare Pages** — build command `npm run build`, output dir per Next.js (`dist` if using a static Vite variant, `.next` via `@cloudflare/next-on-pages` for this repo).
-5. **Set environment variables in Pages settings** — either `GOOGLE_VISION_API_KEY` (route runs on the Pages Functions runtime) **or** `NEXT_PUBLIC_WORKER_URL` pointing at your deployed Worker from step 2.
+5. **Set environment variables in Pages settings** — either `IMGBB_API_KEY` + `SCRAPINGDOG_API_KEY` (route runs on the Pages Functions runtime) **or** `NEXT_PUBLIC_WORKER_URL` pointing at your deployed Worker from step 2.
 6. **Push** — Cloudflare Pages auto-deploys. Add the app to your home screen to install the PWA.
 
 ## Out of scope (by design)

@@ -4,7 +4,8 @@ export interface SourceItem {
 
 export interface EntityItem {
   name: string;
-  score: number;
+  /** confidence 0–1, or null when the backend cannot provide one (Scrapingdog Lens) */
+  score: number | null;
 }
 
 export interface SearchResult {

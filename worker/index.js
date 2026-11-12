@@ -1,4 +1,22 @@
-export default {
+// ============================================================
+// Googlr — Cloudflare Worker
+// Card-free reverse image search pipeline:
+//   1. ImgBB       — hosts the image (auto-deletes after 5 min)
+//                    and returns a public URL
+//   2. Scrapingdog — runs Google Lens reverse image search on it
+//   3. This worker — shapes the Lens response into the same JSON
+//      contract as the Next.js /api/search route.
+//
+// Receives { image: "<base64>", mimeType: "image/jpeg" }.
+// Never writes to disk, never leaks the keys.
+//
+// Deploy:
+//   wrangler secret put IMGBB_API_KEY
+//   wrangler secret put SCRAPINGDOG_API_KEY
+//   wrangler deploy
+// ============================================================
+
+const worker = {
   async fetch(request, env) {
     if (request.method === 'OPTIONS') {
       return new Response(null, {
@@ -35,7 +53,10 @@ export default {
       }
 
       const imgbbData = await imgbbRes.json();
-      const imageUrl = imgbbData.data.url;
+      const imageUrl = imgbbData?.data?.url;
+      if (!imageUrl) {
+        throw new Error('ImgBB upload failed: no URL in response');
+      }
 
       // Step 2: Send to Scrapingdog Google Lens
       const params = new URLSearchParams({
@@ -56,6 +77,7 @@ export default {
       const dogData = await dogRes.json();
 
       // Step 3: Shape response to match what the frontend expects
+      // (kept in lockstep with src/app/api/search/route.ts)
       const organic = dogData.organic_results || [];
       const visual = dogData.visual_matches || [];
       const kg = dogData.knowledge_graph || {};
@@ -67,11 +89,23 @@ export default {
         visual[0]?.title ||
         'No match found';
 
-      // Sources: organic results (pages where image appears)
-      const sources = organic.slice(0, 5).map(r => ({
-        url: r.link,
-        label: r.source || new URL(r.link).hostname,
-      }));
+      // Sources: organic results (pages where the image appears).
+      // Rows without a link are skipped rather than failing the whole search;
+      // collection continues until 5 valid rows are found.
+      const sources = [];
+      for (const r of organic) {
+        if (sources.length >= 5) break;
+        if (!r.link) continue;
+        let label = r.source;
+        if (!label) {
+          try {
+            label = new URL(r.link).hostname;
+          } catch {
+            label = r.link;
+          }
+        }
+        sources.push({ url: r.link, label });
+      }
 
       // Similar images: visual matches thumbnail strip
       const similarImages = visual.slice(0, 10).map(v => ({
@@ -82,11 +116,13 @@ export default {
 
       // Entities: deduplicated titles from organic + visual as tag cloud
       const seen = new Set();
-      const entities = [...organic, ...visual]
-        .map(r => r.title)
-        .filter(t => t && !seen.has(t) && seen.add(t))
-        .slice(0, 8)
-        .map(name => ({ name, score: null }));
+      const entities = [];
+      for (const r of [...organic, ...visual]) {
+        if (!r.title || seen.has(r.title)) continue;
+        seen.add(r.title);
+        entities.push({ name: r.title, score: null });
+        if (entities.length >= 8) break;
+      }
 
       return new Response(JSON.stringify({
         bestGuess,
@@ -121,3 +157,5 @@ export default {
     }
   }
 };
+
+export default worker;
