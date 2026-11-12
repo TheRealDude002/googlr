@@ -82,7 +82,7 @@ export default function Results({ result, onBack, onSearchAgain, onToast }: Resu
           {flagged ? '⚠ flagged' : '✓ safe'} · safe search
         </span>
         {result.demo ? (
-          <p className="demo-note">demo mode — add IMGBB_API_KEY + SCRAPINGDOG_API_KEY for live results</p>
+          <p className="demo-note">demo mode — add IMGBB_API_KEY + LENS_WORKER_URL for live results</p>
         ) : null}
       </header>
 

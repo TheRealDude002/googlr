@@ -4,7 +4,7 @@ export interface SourceItem {
 
 export interface EntityItem {
   name: string;
-  /** confidence 0–1, or null when the backend cannot provide one (Scrapingdog Lens) */
+  /** confidence 0–1, or null when the backend cannot provide one (Lens scraper) */
   score: number | null;
 }
 

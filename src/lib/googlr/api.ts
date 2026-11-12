@@ -12,8 +12,8 @@ export interface SearchOutcome {
  * 1. Compress to <= 1MB JPEG in the browser (canvas).
  * 2. POST base64 to the search endpoint:
  *    - same-origin Next.js API route (/api/search) by default, or
- *    - a Cloudflare Worker when NEXT_PUBLIC_WORKER_URL is set at build time.
- * The ImgBB and Scrapingdog API keys live server-side only — the browser never sees them.
+ *    - the Cloudflare proxy-worker when NEXT_PUBLIC_WORKER_URL is set at build time.
+ * The ImgBB key and lens-worker URL live server-side only — the browser never sees them.
  */
 export async function searchImage(file: File): Promise<SearchOutcome> {
   const imageDataUrl = await compressImage(file, 1024 * 1024);

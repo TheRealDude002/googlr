@@ -1,0 +1,15 @@
+name = "googlr-lens-worker"
+main = "index.js"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[browser]]
+binding = "BROWSER"
+
+# Local dev override — mock mode on, no BROWSER binding needed
+[env.local.vars]
+USE_MOCK = "true"
+
+# Production — mock off, real browser binding active
+[env.production.vars]
+USE_MOCK = "false"

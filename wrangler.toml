@@ -1,7 +1,0 @@
-name = "googlr-worker"
-main = "worker/index.js"
-compatibility_date = "2024-09-01"
-
-# Store the API keys as secrets (never in code):
-#   wrangler secret put IMGBB_API_KEY
-#   wrangler secret put SCRAPINGDOG_API_KEY

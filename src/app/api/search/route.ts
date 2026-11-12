@@ -6,124 +6,19 @@ import { NextResponse } from 'next/server';
  * Accepts  POST { image: "<base64>", mimeType: "image/jpeg" }
  * Returns  { bestGuess, safeSearch, sources, partialMatches, similarImages, entities }
  *
- * Card-free pipeline (identical to the Cloudflare Worker in worker/index.js):
+ * Pipeline (mirrors worker/proxy-worker/index.js):
  *   1. ImgBB       — hosts the image (auto-deletes after 5 minutes) and
  *                    returns a public URL
- *   2. Scrapingdog — runs Google Lens reverse image search on that URL
- *   3. This route  — shapes the Lens response into the JSON contract the
- *                    frontend already expects
+ *   2. lens-worker — Cloudflare Browser Rendering Worker that scrapes
+ *                    Google Lens headlessly (no third-party search API,
+ *                    no Scrapingdog / SerpApi keys)
+ *   3. This route  — passes the lens-worker JSON straight to the frontend
  *
- * Both API keys live server-side only — the browser never sees them.
- * When either key is missing the route returns clearly-flagged demo data so
- * the full UI flow stays usable (e.g. in sandbox previews / before keys are
- * configured).
+ * Secrets live server-side only — the browser never sees them.
+ * When IMGBB_API_KEY or LENS_WORKER_URL is missing the route returns
+ * clearly-flagged demo data so the full UI flow stays usable (e.g. in
+ * sandbox previews / before the environment is configured).
  */
-
-interface LensOrganicResult {
-  title?: string;
-  link?: string;
-  source?: string;
-  thumbnail?: string;
-}
-
-interface LensVisualMatch {
-  title?: string;
-  link?: string;
-  thumbnail?: string;
-}
-
-interface LensKnowledgeGraph {
-  title?: string;
-  description?: string;
-}
-
-interface LensResponse {
-  organic_results?: LensOrganicResult[];
-  visual_matches?: LensVisualMatch[];
-  knowledge_graph?: LensKnowledgeGraph;
-}
-
-interface SourceDto {
-  url: string;
-  label?: string;
-}
-
-interface SimilarImageDto {
-  url: string;
-  sourceUrl?: string;
-  title?: string;
-}
-
-interface ShapedResult {
-  bestGuess: string;
-  safeSearch: 'safe' | 'flagged';
-  sources: SourceDto[];
-  partialMatches: SourceDto[];
-  similarImages: SimilarImageDto[];
-  entities: { name: string; score: number | null }[];
-}
-
-/**
- * Shapes a Scrapingdog Google Lens payload into the frontend contract.
- * Kept in lockstep with worker/index.js — the two backends must stay
- * byte-compatible in what they return.
- */
-function shapeLensResponse(dogData: LensResponse): ShapedResult {
-  const organic = dogData.organic_results || [];
-  const visual = dogData.visual_matches || [];
-  const kg = dogData.knowledge_graph || {};
-
-  // Best guess: knowledge graph title → first organic title → first visual title → fallback
-  const bestGuess =
-    kg.title ||
-    organic[0]?.title ||
-    visual[0]?.title ||
-    'No match found';
-
-  // Sources: organic results (pages where the image appears).
-  // Rows without a link are skipped rather than failing the whole search;
-  // collection continues until 5 valid rows are found.
-  const sources: SourceDto[] = [];
-  for (const r of organic) {
-    if (sources.length >= 5) break;
-    if (!r.link) continue;
-    let label = r.source;
-    if (!label) {
-      try {
-        label = new URL(r.link).hostname;
-      } catch {
-        label = r.link;
-      }
-    }
-    sources.push({ url: r.link, label });
-  }
-
-  // Similar images: visual matches thumbnail strip
-  const similarImages: SimilarImageDto[] = visual.slice(0, 10).map((v) => ({
-    url: v.thumbnail,
-    sourceUrl: v.link,
-    title: v.title,
-  }));
-
-  // Entities: deduplicated titles from organic + visual as tag cloud
-  const seen = new Set<string>();
-  const entities: ShapedResult['entities'] = [];
-  for (const r of [...organic, ...visual]) {
-    if (!r.title || seen.has(r.title)) continue;
-    seen.add(r.title);
-    entities.push({ name: r.title, score: null });
-    if (entities.length >= 8) break;
-  }
-
-  return {
-    bestGuess,
-    safeSearch: 'safe', // Scrapingdog doesn't flag; default safe
-    sources,
-    partialMatches: [],
-    similarImages,
-    entities,
-  };
-}
 
 interface DemoThumbSpec {
   hue: number;
@@ -195,31 +90,30 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const image: unknown = body?.image;
-    const mimeType: string = typeof body?.mimeType === 'string' ? body.mimeType : 'image/jpeg';
 
     if (typeof image !== 'string' || image.length === 0) {
       return NextResponse.json({ error: 'Missing image data' }, { status: 400 });
     }
 
     const imgbbKey = process.env.IMGBB_API_KEY;
-    const dogKey = process.env.SCRAPINGDOG_API_KEY;
-    if (!imgbbKey || !dogKey) {
-      // Keys not configured — serve clearly-flagged demo data.
+    const lensWorkerUrl = process.env.LENS_WORKER_URL;
+    if (!imgbbKey || !lensWorkerUrl) {
+      // Environment not configured — serve clearly-flagged demo data.
       return NextResponse.json(demoResult());
     }
 
     // Strip base64 prefix if present
     const base64 = image.includes(',') ? image.split(',')[1] : image;
 
-    // Step 1: Upload to ImgBB
+    // Step 1: Upload to ImgBB → get a public URL (auto-deletes after 5 minutes)
     const imgbbForm = new URLSearchParams();
     imgbbForm.append('image', base64);
     imgbbForm.append('expiration', '300');
 
-    const imgbbRes = await fetch(
-      `https://api.imgbb.com/1/upload?key=${imgbbKey}`,
-      { method: 'POST', body: imgbbForm }
-    );
+    const imgbbRes = await fetch(`https://api.imgbb.com/1/upload?key=${imgbbKey}`, {
+      method: 'POST',
+      body: imgbbForm,
+    });
 
     if (!imgbbRes.ok) {
       throw new Error(`ImgBB upload failed: ${imgbbRes.status}`);
@@ -231,26 +125,20 @@ export async function POST(request: Request) {
       throw new Error('ImgBB upload failed: no URL in response');
     }
 
-    // Step 2: Send to Scrapingdog Google Lens
-    const params = new URLSearchParams({
-      api_key: dogKey,
-      url: imageUrl,
-      visual_matches: 'true',
-      country: 'us',
+    // Step 2: Send public URL to the lens-worker (headless Google Lens scraper)
+    const lensRes = await fetch(lensWorkerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageUrl }),
     });
 
-    const dogRes = await fetch(
-      `https://api.scrapingdog.com/google_lens?${params.toString()}`
-    );
-
-    if (!dogRes.ok) {
-      throw new Error(`Scrapingdog failed: ${dogRes.status}`);
+    if (!lensRes.ok) {
+      throw new Error(`Lens worker failed: ${lensRes.status}`);
     }
 
-    const dogData: LensResponse = await dogRes.json();
-
-    // Step 3: Shape response to match what the frontend expects
-    return NextResponse.json(shapeLensResponse(dogData));
+    // Step 3: lens-worker already returns the frontend JSON contract — pass it through
+    const result = await lensRes.json();
+    return NextResponse.json(result);
   } catch (err) {
     return NextResponse.json(
       {
