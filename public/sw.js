@@ -52,7 +52,10 @@ self.addEventListener('fetch', (event) => {
         .then((response) => {
           if (response.ok || response.type === 'opaque') {
             const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+            // Only cache http/https — chrome-extension:// etc. are unsupported
+            if (request.url.startsWith('http')) {
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+            }
           }
           return response;
         })
