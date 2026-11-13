@@ -4,6 +4,25 @@ main = "index.js"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
+[observability]
+enabled = true
+head_sampling_rate = 1
+redact_query_string = false
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+invocation_logs = true
+persist = true
+
+[observability.traces]
+enabled = true
+head_sampling_rate = 1
+persist = true
+
+[observability.issues]
+enabled = true
+
 [browser]
 binding = "BROWSER"
 
